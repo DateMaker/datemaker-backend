@@ -167,7 +167,20 @@ async function setCachedData(key, data, ttl = CACHE_TTL) {
 // FIREBASE INITIALIZATION
 // =====================================================
 
-const serviceAccount = require('./serviceAccountKey.json');
+// Firebase Admin Setup
+let serviceAccount;
+
+if (process.env.FIREBASE_SERVICE_ACCOUNT_BASE64) {
+  // Production: decode from base64 environment variable
+  const serviceAccountJson = Buffer.from(
+    process.env.FIREBASE_SERVICE_ACCOUNT_BASE64,
+    'base64'
+  ).toString('utf-8');
+  serviceAccount = JSON.parse(serviceAccountJson);
+} else {
+  // Development: load from file
+  serviceAccount = require('./serviceAccountKey.json');
+}
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
@@ -188,13 +201,7 @@ app.post('/api/webhook',
 );
 
 // Standard middleware for all other routes
-app.use(cors({
-  origin: [
-    'http://localhost:3000',
-    'http://192.168.68.103:3000'
-  ],
-  credentials: true
-}));
+
 
 app.use(express.json());
 
