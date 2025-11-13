@@ -202,11 +202,22 @@ app.post('/api/webhook',
 
 // Standard middleware for all other routes
 
+// CORS Configuration
+app.use(cors({
+  origin: [
+    'https://datemaker-frontend.vercel.app',
+    'https://datemaker-frontend-git-main-datemakers-projects.vercel.app',
+    'https://datemaker-frontend-fezowva4r-datemakers-projects.vercel.app',
+    'http://localhost:3000'
+  ],
+  credentials: true
+}));
 
 app.use(express.json());
 
 // 🛡️ Apply general rate limiting to all routes
 app.use('/api/', generalLimiter);
+
 
 // Request logging
 app.use((req, res, next) => {
