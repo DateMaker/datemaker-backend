@@ -55,7 +55,7 @@ const geocodeLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 50,
   message: {
-    error: 'Too many location searches. Please try again in a few minutes.',
+    error: 'Spam prevention. Date Generating will work again in a few minutes.',
     retryAfter: '15 minutes'
   },
   standardHeaders: true,
