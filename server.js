@@ -189,6 +189,7 @@ admin.initializeApp({
 
 const db = admin.firestore();
 const app = express();
+app.set('trust proxy', 1);
 
 // =====================================================
 // MIDDLEWARE
@@ -726,14 +727,23 @@ async function handleCheckoutCompleted(session) {
 
   const subscription = await stripe.subscriptions.retrieve(session.subscription);
   
-  await db.collection('users').doc(userId).update({
-    stripeCustomerId: session.customer,
-    stripeSubscriptionId: session.subscription,
-    subscriptionStatus: 'trial',
-    subscriptionPlan: session.metadata.plan || 'monthly',
-    trialEndsAt: new Date(subscription.trial_end * 1000).toISOString(),
-    updatedAt: admin.firestore.FieldValue.serverTimestamp()
-  });
+  const updateData = {
+  stripeSubscriptionId: subscription.id,
+  subscriptionStatus: status,
+  updatedAt: admin.firestore.FieldValue.serverTimestamp()
+};
+
+// Only add trialEndsAt if it exists and is valid
+if (subscription.trial_end && !isNaN(subscription.trial_end)) {
+  updateData.trialEndsAt = new Date(subscription.trial_end * 1000).toISOString();
+}
+
+// Only add currentPeriodEnd if it exists and is valid
+if (subscription.current_period_end && !isNaN(subscription.current_period_end)) {
+  updateData.currentPeriodEnd = new Date(subscription.current_period_end * 1000).toISOString();
+}
+
+await db.collection('users').doc(userId).update(updateData);
 
   console.log(`✅ User ${userId} updated with trial subscription`);
 }
