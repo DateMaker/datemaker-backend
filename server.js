@@ -209,6 +209,8 @@ app.use(cors({
     'https://datemaker-frontend.vercel.app',
     'https://datemaker-frontend-git-main-datemakers-projects.vercel.app',
     'https://datemaker-frontend-fezowva4r-datemakers-projects.vercel.app',
+    'https://thedatemakerapp.com',        
+    'https://www.thedatemakerapp.com',    
     'http://localhost:3000'
   ],
   credentials: true
