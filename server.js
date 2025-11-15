@@ -729,11 +729,15 @@ async function handleCheckoutCompleted(session) {
 
   const subscription = await stripe.subscriptions.retrieve(session.subscription);
   
+  // ✅ DETERMINE STATUS CORRECTLY
+  const status = subscription.status === 'trialing' ? 'trial' : 'premium';
+  
   const updateData = {
-  stripeSubscriptionId: subscription.id,
-  subscriptionStatus: status,
-  updatedAt: admin.firestore.FieldValue.serverTimestamp()
-};
+    stripeCustomerId: session.customer,
+    stripeSubscriptionId: subscription.id,
+    subscriptionStatus: status,
+    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+  };
 
 // Only add trialEndsAt if it exists and is valid
 if (subscription.trial_end && !isNaN(subscription.trial_end)) {
