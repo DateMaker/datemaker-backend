@@ -211,7 +211,11 @@ app.use(cors({
     'https://datemaker-frontend-fezowva4r-datemakers-projects.vercel.app',
     'https://thedatemakerapp.com',        
     'https://www.thedatemakerapp.com',    
-    'http://localhost:3000'
+    'http://localhost:3000',
+    'capacitor://localhost',           // ✅ For iOS app
+    'ionic://localhost',               // ✅ For Android app (future)
+    'http://localhost',                // ✅ Additional fallback
+    'http://192.168.68.102:3001'      // ✅ Your local IP
   ],
   credentials: true
 }));
@@ -919,7 +923,7 @@ async function handlePaymentFailed(invoice) {
 
 app.post('/api/create-checkout-session', checkoutLimiter, async (req, res) => {
   try {
-    const { userId, plan = 'monthly', email } = req.body;
+    const { userId, plan = 'monthly', email, platform } = req.body;
 
     if (!userId) {
       return res.status(400).json({ error: 'userId is required' });
@@ -946,6 +950,21 @@ app.post('/api/create-checkout-session', checkoutLimiter, async (req, res) => {
       });
     }
 
+    // Determine redirect URLs based on platform
+    let successUrl, cancelUrl;
+    
+    if (platform === 'ios') {
+      // iOS app - use custom URL scheme
+      successUrl = 'datemaker://checkout-success';
+      cancelUrl = 'datemaker://checkout-cancelled';
+      console.log('📱 iOS checkout - using deep links');
+    } else {
+      // Web - use normal URLs
+      successUrl = `${process.env.FRONTEND_URL}?checkout=success`;
+      cancelUrl = `${process.env.FRONTEND_URL}?checkout=cancelled`;
+      console.log('🌐 Web checkout - using web URLs');
+    }
+
     const session = await stripe.checkout.sessions.create({
       customer_email: email || userData?.email,
       client_reference_id: userId,
@@ -966,8 +985,8 @@ app.post('/api/create-checkout-session', checkoutLimiter, async (req, res) => {
         userId: userId,
         plan: plan
       },
-      success_url: `${process.env.FRONTEND_URL}?checkout=success`,
-      cancel_url: `${process.env.FRONTEND_URL}?checkout=cancelled`,
+      success_url: successUrl,
+      cancel_url: cancelUrl,
     });
 
     console.log(`✅ Checkout session created for user ${userId}: ${session.id}`);
