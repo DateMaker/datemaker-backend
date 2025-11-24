@@ -10,6 +10,7 @@ const cors = require('cors');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const admin = require('firebase-admin');
 const axios = require('axios');
+const multer = require('multer');
 const { createClient } = require('redis');
 const rateLimit = require('express-rate-limit');
 
@@ -80,6 +81,27 @@ const checkoutLimiter = rateLimit({
   max: 10,
   message: {
     error: 'Too many checkout attempts. Please contact support if you need help.',
+    retryAfter: '15 minutes'
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// =====================================================
+// 📸 PHOTO UPLOAD CONFIGURATION
+// =====================================================
+
+const upload = multer({ 
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 } // 10MB max
+});
+
+// Rate limit for uploads - 20 per 15 minutes
+const uploadLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  message: {
+    error: 'Too many uploads. Please try again in a few minutes.',
     retryAfter: '15 minutes'
   },
   standardHeaders: true,
@@ -535,6 +557,95 @@ app.get('/api/photo', photoLimiter, async (req, res) => {
       error: 'Failed to fetch photo',
       message: error.message 
     });
+  }
+});
+
+// =====================================================
+// 📸 PHOTO UPLOAD (For iOS/Mobile scrapbook photos)
+// Supports both multipart form data AND base64 JSON
+// =====================================================
+
+app.post('/api/upload-photo', uploadLimiter, async (req, res) => {
+  try {
+    // Verify auth token first
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const token = authHeader.split('Bearer ')[1];
+    const decodedToken = await admin.auth().verifyIdToken(token);
+    const userId = decodedToken.uid;
+
+    console.log(`📸 Upload request from user ${userId}`);
+
+    let fileBuffer, fileName, mimeType;
+
+    // Check if it's a base64 JSON upload (iOS) or multipart form (web)
+    if (req.body.photo && typeof req.body.photo === 'string') {
+      // BASE64 JSON UPLOAD (iOS)
+      console.log('📱 Processing base64 upload (iOS)');
+      
+      const base64Data = req.body.photo;
+      const matches = base64Data.match(/^data:(.+);base64,(.+)$/);
+      
+      if (!matches) {
+        return res.status(400).json({ error: 'Invalid base64 format' });
+      }
+      
+      mimeType = matches[1];
+      fileBuffer = Buffer.from(matches[2], 'base64');
+      fileName = req.body.fileName || `photo_${Date.now()}.jpg`;
+      
+      console.log(`📸 Base64 decoded: ${fileBuffer.length} bytes, type: ${mimeType}`);
+    } else {
+      // MULTIPART FORM UPLOAD (web) - use multer middleware
+      return upload.single('photo')(req, res, async (err) => {
+        if (err) {
+          console.error('Multer error:', err);
+          return res.status(400).json({ error: 'File upload error' });
+        }
+        
+        if (!req.file) {
+          return res.status(400).json({ error: 'No file provided' });
+        }
+
+        console.log('🌐 Processing multipart upload (web)');
+        
+        const bucket = admin.storage().bucket();
+        const storedFileName = `dateMemories/${userId}/${Date.now()}_${req.file.originalname.replace(/[^a-zA-Z0-9.]/g, '_')}`;
+        const file = bucket.file(storedFileName);
+
+        await file.save(req.file.buffer, {
+          metadata: { contentType: req.file.mimetype }
+        });
+
+        await file.makePublic();
+        const publicUrl = `https://storage.googleapis.com/${bucket.name}/${storedFileName}`;
+
+        console.log(`✅ Photo uploaded: ${storedFileName}`);
+        return res.json({ success: true, url: publicUrl });
+      });
+    }
+
+    // Process base64 upload
+    const bucket = admin.storage().bucket();
+    const storedFileName = `dateMemories/${userId}/${Date.now()}_${fileName.replace(/[^a-zA-Z0-9.]/g, '_')}`;
+    const file = bucket.file(storedFileName);
+
+    await file.save(fileBuffer, {
+      metadata: { contentType: mimeType }
+    });
+
+    await file.makePublic();
+    const publicUrl = `https://storage.googleapis.com/${bucket.name}/${storedFileName}`;
+
+    console.log(`✅ Photo uploaded: ${storedFileName}`);
+    res.json({ success: true, url: publicUrl });
+
+  } catch (error) {
+    console.error('❌ Upload error:', error);
+    res.status(500).json({ error: 'Upload failed', message: error.message });
   }
 });
 
