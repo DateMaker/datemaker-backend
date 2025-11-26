@@ -242,7 +242,7 @@ app.use(cors({
   credentials: true
 }));
 
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 
 // 🛡️ Apply general rate limiting to all routes
 app.use('/api/', generalLimiter);
