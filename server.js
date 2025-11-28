@@ -255,6 +255,63 @@ app.use((req, res, next) => {
 });
 
 // =====================================================
+// WEB CHECKOUT (External Payment - No Apple Fee!)
+// =====================================================
+
+app.post('/api/create-web-checkout', checkoutLimiter, async (req, res) => {
+  try {
+    const { plan, userId, email } = req.body;
+    
+    // Verify Firebase token
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    
+    const token = authHeader.split('Bearer ')[1];
+    await admin.auth().verifyIdToken(token);
+
+    if (!userId) {
+      return res.status(400).json({ error: 'userId is required' });
+    }
+
+    const priceId = plan === 'yearly' 
+      ? process.env.STRIPE_ANNUAL_PRICE_ID 
+      : process.env.STRIPE_MONTHLY_PRICE_ID;
+
+    if (!priceId) {
+      return res.status(500).json({ error: 'Price ID not configured for plan: ' + plan });
+    }
+
+    const session = await stripe.checkout.sessions.create({
+      customer_email: email,
+      client_reference_id: userId,
+      payment_method_types: ['card'],
+      mode: 'subscription',
+      line_items: [{
+        price: priceId,
+        quantity: 1,
+      }],
+      subscription_data: {
+        trial_period_days: 7,
+        metadata: { userId, plan, source: 'web' }
+      },
+      metadata: { userId, plan, source: 'web' },
+     success_url: `https://www.thedatemakerapp.com/#/payment-success?session_id={CHECKOUT_SESSION_ID}&user_id=${userId}`,
+     cancel_url: `https://www.thedatemakerapp.com/#/subscribe?canceled=true`,
+    });
+
+    console.log(`✅ Web checkout created for ${userId}: ${session.id}`);
+    res.json({ url: session.url, sessionId: session.id });
+
+  } catch (error) {
+    console.error('Web checkout error:', error);
+    res.status(500).json({ error: 'Failed to create checkout', message: error.message });
+  }
+});
+
+
+// =====================================================
 // GEOCODING API (Convert address to coordinates)
 // 🔥 WITH CACHING! 🛡️ WITH RATE LIMITING!
 // =====================================================
