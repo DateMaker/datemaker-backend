@@ -317,7 +317,6 @@ app.post('/api/create-web-checkout', checkoutLimiter, async (req, res) => {
 app.get('/api/redirect-to-app', (req, res) => {
   const userId = req.query.user_id || '';
   const sessionId = req.query.session_id || '';
-  const deepLink = `datemaker://payment-success?status=success&user_id=${userId}&session_id=${sessionId}`;
   
   console.log(`🔄 Redirecting user ${userId} to app via deep link`);
   
@@ -357,17 +356,18 @@ app.get('/api/redirect-to-app', (req, res) => {
           border-radius: 12px;
           font-weight: 600;
           font-size: 1.1rem;
+          border: none;
+          cursor: pointer;
         }
-        .spinner {
-          width: 40px;
-          height: 40px;
-          border: 4px solid #e5e7eb;
-          border-top: 4px solid #ec4899;
-          border-radius: 50%;
-          animation: spin 1s linear infinite;
-          margin: 0 auto 1rem;
+        .btn:active {
+          transform: scale(0.98);
+          opacity: 0.9;
         }
-        @keyframes spin { to { transform: rotate(360deg); } }
+        .success-check {
+          color: #10b981;
+          font-weight: 600;
+          margin-bottom: 1.5rem;
+        }
       </style>
     </head>
     <body>
@@ -375,29 +375,35 @@ app.get('/api/redirect-to-app', (req, res) => {
         <div style="font-size: 4rem; margin-bottom: 1rem;">🎉</div>
         <h1>Payment Successful!</h1>
         <p>Your 7-day free trial has started.</p>
-        <div class="spinner"></div>
-        <p>Opening DateMaker...</p>
-        <a href="${deepLink}" class="btn">Open App</a>
-        <p style="font-size: 0.875rem; color: #999; margin-top: 1rem;">
-          If the app doesn't open automatically, tap the button above.
+        <p class="success-check">✓ Your account has been upgraded</p>
+        <button class="btn" onclick="closePage()">Close Page</button>
+        <p style="font-size: 0.8rem; color: #999; margin-top: 1.5rem;">
+          Tap the X in the top-left if the button doesn't work
         </p>
       </div>
       <script>
-        // Try to open app immediately
-        setTimeout(function() {
-          window.location.href = "${deepLink}";
-        }, 1000);
-        
-        // Try again after 2 seconds
-        setTimeout(function() {
-          window.location.href = "${deepLink}";
-        }, 2500);
+        function closePage() {
+          // For Capacitor in-app browser, posting a message or navigating can trigger close
+          if (window.webkit && window.webkit.messageHandlers) {
+            // Try to trigger Capacitor's close
+            try {
+              window.webkit.messageHandlers.bridge.postMessage({ type: 'close' });
+            } catch(e) {}
+          }
+          
+          // Standard close attempts
+          window.close();
+          
+          // Fallback - navigate to blank (some browsers close on this)
+          setTimeout(function() {
+            window.location.href = 'about:blank';
+          }, 100);
+        }
       </script>
     </body>
     </html>
   `);
 });
-
 
 // =====================================================
 // GEOCODING API (Convert address to coordinates)
