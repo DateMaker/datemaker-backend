@@ -297,7 +297,7 @@ app.post('/api/create-web-checkout', checkoutLimiter, async (req, res) => {
         metadata: { userId, plan, source: 'web' }
       },
       metadata: { userId, plan, source: 'web' },
-     success_url: `https://www.thedatemakerapp.com/#/payment-success?session_id={CHECKOUT_SESSION_ID}&user_id=${userId}`,
+    success_url: `https://datemaker-backend-1.onrender.com/api/redirect-to-app?session_id={CHECKOUT_SESSION_ID}&user_id=${userId}`,
      cancel_url: `https://www.thedatemakerapp.com/#/subscribe?canceled=true`,
     });
 
@@ -308,6 +308,94 @@ app.post('/api/create-web-checkout', checkoutLimiter, async (req, res) => {
     console.error('Web checkout error:', error);
     res.status(500).json({ error: 'Failed to create checkout', message: error.message });
   }
+});
+
+// =====================================================
+// REDIRECT TO APP AFTER PAYMENT (Bypasses Vercel)
+// =====================================================
+
+app.get('/api/redirect-to-app', (req, res) => {
+  const userId = req.query.user_id || '';
+  const sessionId = req.query.session_id || '';
+  const deepLink = `datemaker://payment-success?status=success&user_id=${userId}&session_id=${sessionId}`;
+  
+  console.log(`🔄 Redirecting user ${userId} to app via deep link`);
+  
+  res.send(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Payment Successful!</title>
+      <meta name="viewport" content="width=device-width, initial-scale=1">
+      <style>
+        body {
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          min-height: 100vh;
+          margin: 0;
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .container {
+          background: white;
+          padding: 3rem;
+          border-radius: 24px;
+          text-align: center;
+          max-width: 400px;
+          margin: 1rem;
+          box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        h1 { color: #111; margin-bottom: 0.5rem; }
+        p { color: #666; margin-bottom: 1.5rem; }
+        .btn {
+          display: inline-block;
+          padding: 1rem 2rem;
+          background: linear-gradient(to right, #ec4899, #a855f7);
+          color: white;
+          text-decoration: none;
+          border-radius: 12px;
+          font-weight: 600;
+          font-size: 1.1rem;
+        }
+        .spinner {
+          width: 40px;
+          height: 40px;
+          border: 4px solid #e5e7eb;
+          border-top: 4px solid #ec4899;
+          border-radius: 50%;
+          animation: spin 1s linear infinite;
+          margin: 0 auto 1rem;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div style="font-size: 4rem; margin-bottom: 1rem;">🎉</div>
+        <h1>Payment Successful!</h1>
+        <p>Your 7-day free trial has started.</p>
+        <div class="spinner"></div>
+        <p>Opening DateMaker...</p>
+        <a href="${deepLink}" class="btn">Open App</a>
+        <p style="font-size: 0.875rem; color: #999; margin-top: 1rem;">
+          If the app doesn't open automatically, tap the button above.
+        </p>
+      </div>
+      <script>
+        // Try to open app immediately
+        setTimeout(function() {
+          window.location.href = "${deepLink}";
+        }, 1000);
+        
+        // Try again after 2 seconds
+        setTimeout(function() {
+          window.location.href = "${deepLink}";
+        }, 2500);
+      </script>
+    </body>
+    </html>
+  `);
 });
 
 
