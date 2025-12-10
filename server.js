@@ -13,6 +13,7 @@ const axios = require('axios');
 const multer = require('multer');
 const { createClient } = require('redis');
 const rateLimit = require('express-rate-limit');
+const appleIAPRoutes = require('./routes/appleIAP');
 
 // =====================================================
 // 🛡️ RATE LIMITING CONFIGURATION (NEW!)
@@ -247,6 +248,7 @@ app.use(express.json({ limit: '10mb' }));
 // 🛡️ Apply general rate limiting to all routes
 app.use('/api/', generalLimiter);
 
+app.use('/api', appleIAPRoutes);
 
 // Request logging
 app.use((req, res, next) => {
